@@ -1,9 +1,7 @@
 pragma solidity ^0.4.11;
 
-import "tokens/eip20/EIP20Interface.sol";
 import "./Parameterizer.sol";
-import "plcr-revival/PLCRVoting.sol";
-import "zeppelin/math/SafeMath.sol";
+import "./../installed_contracts/plcr-revival/contracts/PLCRVoting.sol";
 
 contract Registry {
 
@@ -33,7 +31,7 @@ contract Registry {
         address owner;          // Owner of Listing
         uint unstakedDeposit;   // Number of tokens in the listing not locked in a challenge
         uint challengeID;       // Corresponds to a PollID in PLCRVoting
-	uint exitTime;		// Time the listing may leave the registry
+        uint exitTime;		// Time the listing may leave the registry
         uint exitTimeExpiry;    // Expiration date of exit period
     }
 
@@ -155,9 +153,8 @@ contract Registry {
         // Set when the listing may be removed from the whitelist
         listing.exitTime = now.add(parameterizer.get("exitTimeDelay"));
 	// Set exit period end time
-	listing.exitTimeExpiry = listing.exitTime.add(parameterizer.get("exitPeriodLen"));
-        emit _ExitInitialized(_listingHash, listing.exitTime,
-            listing.exitTimeExpiry, msg.sender);
+        listing.exitTimeExpiry = listing.exitTime.add(parameterizer.get("exitPeriodLen"));
+        emit _ExitInitialized(_listingHash, listing.exitTime,listing.exitTimeExpiry, msg.sender);
     }
 
     /**
@@ -175,7 +172,7 @@ contract Registry {
         // Make sure the exit was initialized
         require(listing.exitTime > 0);
         // Time to exit has to be after exit delay but before the exitPeriodLen is over 
-	require(listing.exitTime < now && now < listing.exitTimeExpiry);
+        require(listing.exitTime < now && now < listing.exitTimeExpiry);
 
         resetListing(_listingHash);
         emit _ListingWithdrawn(_listingHash, msg.sender);
@@ -233,9 +230,9 @@ contract Registry {
         // Takes tokens from challenger
         require(token.transferFrom(msg.sender, this, minDeposit));
 
-	uint commitEndDate;
-	uint revealEndDate;
-        (commitEndDate, revealEndDate,) = voting.pollMap(pollID);
+        uint commitEndDate;
+        uint revealEndDate;
+        (,,commitEndDate, revealEndDate,) = voting.pollMap(pollID);
 
         emit _Challenge(_listingHash, pollID, _data, commitEndDate, revealEndDate, msg.sender);
         return pollID;
