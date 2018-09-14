@@ -12,7 +12,7 @@ contract('ParameterizerFactory', (accounts) => {
   describe('Function: newParameterizerWithToken', () => {
     let parameterizerFactory;
 
-    before(async () => {
+    beforeEach(async () => {
       parameterizerFactory = await ParameterizerFactory.deployed();
     });
 
@@ -38,6 +38,8 @@ contract('ParameterizerFactory', (accounts) => {
         paramConfig.pDispensationPct,
         paramConfig.voteQuorum,
         paramConfig.pVoteQuorum,
+        paramConfig.exitTimeDelay,
+        paramConfig.exitPeriodLen,
       ];
       const parameterizerReceipt = await parameterizerFactory.newParameterizerWithToken(
         tokenParams.supply,

@@ -1,9 +1,7 @@
 pragma solidity ^0.4.11;
 
-import "tokens/eip20/EIP20Interface.sol";
 import "./Parameterizer.sol";
-import "plcr-revival/PLCRVoting.sol";
-import "zeppelin/math/SafeMath.sol";
+import "./../installed_contracts/plcr-revival/contracts/PLCRVoting.sol";
 
 contract Registry {
 
@@ -18,11 +16,12 @@ contract Registry {
     event _ApplicationWhitelisted(bytes32 indexed listingHash);
     event _ApplicationRemoved(bytes32 indexed listingHash);
     event _ListingRemoved(bytes32 indexed listingHash);
-    event _ListingWithdrawn(bytes32 indexed listingHash);
+    event _ListingWithdrawn(bytes32 indexed listingHash, address indexed owner);
     event _TouchAndRemoved(bytes32 indexed listingHash);
     event _ChallengeFailed(bytes32 indexed listingHash, uint indexed challengeID, uint rewardPool, uint totalTokens);
     event _ChallengeSucceeded(bytes32 indexed listingHash, uint indexed challengeID, uint rewardPool, uint totalTokens);
     event _RewardClaimed(uint indexed challengeID, uint reward, address indexed voter);
+    event _ExitInitialized(bytes32 indexed listingHash, uint exitTime, uint exitDelayEndDate, address indexed owner);
 
     using SafeMath for uint;
 
@@ -32,6 +31,8 @@ contract Registry {
         address owner;          // Owner of Listing
         uint unstakedDeposit;   // Number of tokens in the listing not locked in a challenge
         uint challengeID;       // Corresponds to a PollID in PLCRVoting
+        uint exitTime;		// Time the listing may leave the registry
+        uint exitTimeExpiry;    // Expiration date of exit period
     }
 
     struct Challenge {
@@ -135,22 +136,46 @@ contract Registry {
     }
 
     /**
-    @dev                Allows the owner of a listingHash to remove the listingHash from the whitelist
-                        Returns all tokens to the owner of the listingHash
-    @param _listingHash A listingHash msg.sender is the owner of.
+    @dev		Initialize an exit timer for a listing to leave the whitelist
+    @param _listingHash	A listing hash msg.sender is the owner of
     */
-    function exit(bytes32 _listingHash) external {
+    function initExit(bytes32 _listingHash) external {	
         Listing storage listing = listings[_listingHash];
 
         require(msg.sender == listing.owner);
         require(isWhitelisted(_listingHash));
-
         // Cannot exit during ongoing challenge
         require(listing.challengeID == 0 || challenges[listing.challengeID].resolved);
 
-        // Remove listingHash & return tokens
+        // Ensure user never initializedExit or exitPeriodLen passed
+        require(listing.exitTime == 0 || now > listing.exitTimeExpiry);
+
+        // Set when the listing may be removed from the whitelist
+        listing.exitTime = now.add(parameterizer.get("exitTimeDelay"));
+	// Set exit period end time
+        listing.exitTimeExpiry = listing.exitTime.add(parameterizer.get("exitPeriodLen"));
+        emit _ExitInitialized(_listingHash, listing.exitTime,listing.exitTimeExpiry, msg.sender);
+    }
+
+    /**
+    @dev		Allow a listing to leave the whitelist
+    @param _listingHash A listing hash msg.sender is the owner of
+    */
+    function finalizeExit(bytes32 _listingHash) external {
+        Listing storage listing = listings[_listingHash];
+
+        require(msg.sender == listing.owner);
+        require(isWhitelisted(_listingHash));
+        // Cannot exit during ongoing challenge
+        require(listing.challengeID == 0 || challenges[listing.challengeID].resolved);
+
+        // Make sure the exit was initialized
+        require(listing.exitTime > 0);
+        // Time to exit has to be after exit delay but before the exitPeriodLen is over 
+        require(listing.exitTime < now && now < listing.exitTimeExpiry);
+
         resetListing(_listingHash);
-        emit _ListingWithdrawn(_listingHash);
+        emit _ListingWithdrawn(_listingHash, msg.sender);
     }
 
     // -----------------------
@@ -205,7 +230,9 @@ contract Registry {
         // Takes tokens from challenger
         require(token.transferFrom(msg.sender, this, minDeposit));
 
-        var (commitEndDate, revealEndDate,) = voting.pollMap(pollID);
+        uint commitEndDate;
+        uint revealEndDate;
+        (,,commitEndDate, revealEndDate,) = voting.pollMap(pollID);
 
         emit _Challenge(_listingHash, pollID, _data, commitEndDate, revealEndDate, msg.sender);
         return pollID;

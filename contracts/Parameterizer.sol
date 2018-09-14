@@ -1,8 +1,8 @@
 pragma solidity^0.4.11;
 
-import "plcr-revival/PLCRVoting.sol";
-import "tokens/eip20/EIP20Interface.sol";
-import "zeppelin/math/SafeMath.sol";
+import "./../installed_contracts/plcr-revival/contracts/PLCRVoting.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract Parameterizer {
 
@@ -113,6 +113,12 @@ contract Parameterizer {
 
         // type of majority out of 100 necessary for proposal success in parameterizer
         set("pVoteQuorum", _parameters[11]);
+
+        // minimum length of time user has to wait to exit the registry 
+        set("exitTimeDelay", _parameters[12]);
+
+        // maximum length of time user can wait to exit the registry
+        set("exitPeriodLen", _parameters[13]);
     }
 
     // -----------------------
@@ -126,10 +132,10 @@ contract Parameterizer {
     */
     function proposeReparameterization(string _name, uint _value) public returns (bytes32) {
         uint deposit = get("pMinDeposit");
-        bytes32 propID = keccak256(_name, _value);
+        bytes32 propID = keccak256(abi.encodePacked(_name, _value));
 
-        if (keccak256(_name) == keccak256("dispensationPct") ||
-            keccak256(_name) == keccak256("pDispensationPct")) {
+        if (keccak256(abi.encodePacked(_name)) == keccak256("dispensationPct") ||
+            keccak256(abi.encodePacked(_name)) == keccak256("pDispensationPct")) {
             require(_value <= 100);
         }
 
@@ -185,8 +191,9 @@ contract Parameterizer {
 
         //take tokens from challenger
         require(token.transferFrom(msg.sender, this, deposit));
-
-        var (commitEndDate, revealEndDate,) = voting.pollMap(pollID);
+        uint commitEndDate;
+        uint revealEndDate;
+        (,,commitEndDate, revealEndDate,) = voting.pollMap(pollID);
 
         emit _NewChallenge(_propID, pollID, commitEndDate, revealEndDate, msg.sender);
         return pollID;
@@ -344,7 +351,7 @@ contract Parameterizer {
     @param _name the key whose value is to be determined
     */
     function get(string _name) public view returns (uint value) {
-        return params[keccak256(_name)];
+        return params[keccak256(abi.encodePacked(_name))];
     }
 
     /**
@@ -393,7 +400,7 @@ contract Parameterizer {
     @param _value the value to set the param to be set
     */
     function set(string _name, uint _value) private {
-        params[keccak256(_name)] = _value;
+        params[keccak256(abi.encodePacked(_name))] = _value;
     }
 }
 

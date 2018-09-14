@@ -13,7 +13,7 @@ contract('RegistryFactory', (accounts) => {
   describe('Function: newRegistryBYOToken', () => {
     let registryFactory;
 
-    before(async () => {
+    beforeEach(async () => {
       registryFactory = await RegistryFactory.deployed();
     });
 
@@ -46,6 +46,8 @@ contract('RegistryFactory', (accounts) => {
         paramConfig.pDispensationPct,
         paramConfig.voteQuorum,
         paramConfig.pVoteQuorum,
+        paramConfig.exitTimeDelay,
+        paramConfig.exitPeriodLen,
       ];
 
       // new registry using factory/proxy
